@@ -11,6 +11,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.Toast
+import com.example.guess_the_celebrity.data.MySQLiteHelper
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.ByteArrayOutputStream
 import java.io.FileNotFoundException
@@ -24,21 +25,23 @@ import java.util.regex.Pattern
 class MainActivity : AppCompatActivity() {
 
 
-
+    lateinit var mySQLiteHelper : MySQLiteHelper
     var arrayNames = ArrayList<String>()
     var arrayBitmap = ArrayList<Bitmap>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
         val builder = AlertDialog.Builder(this)
         builder.setTitle("No data available")
         builder.setMessage("Need download data. This may take some time.")
         builder.setPositiveButton(android.R.string.ok){ dialog, which ->
             val myAsyncTask = MyAsyncTask()
             myAsyncTask.execute("http://www.posh24.se/kandisar")
+            mySQLiteHelper = MySQLiteHelper(this)
         }
+        builder.show()
+
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -54,6 +57,12 @@ class MainActivity : AppCompatActivity() {
                 ivPhoto.setImageBitmap(arrayBitmap[16])
                 true
             }
+            R.id.itemDownload -> {
+                    val myAsyncTask = MyAsyncTask()
+                    myAsyncTask.execute("http://www.posh24.se/kandisar")
+
+                true
+            }
             else -> {
                 super.onOptionsItemSelected(item)
             }
@@ -64,6 +73,7 @@ class MainActivity : AppCompatActivity() {
 
 
         override fun doInBackground(vararg params: String?): Void? {
+
 
             var resultHttpText = ""
             val url: URL

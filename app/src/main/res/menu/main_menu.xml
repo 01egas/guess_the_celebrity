@@ -3,4 +3,5 @@
 
     <item android:title="Reload" android:id="@+id/itemReload" android:icon="@android:drawable/stat_sys_download_done"
     />
+    <item android:title="Download" android:id="@+id/itemDownload"/>
 </menu>
