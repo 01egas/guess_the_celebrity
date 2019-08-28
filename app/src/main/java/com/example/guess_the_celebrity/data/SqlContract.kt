@@ -4,7 +4,7 @@ import android.provider.BaseColumns
 
 class SqlContract {
 
-    class CelebritieEntry : BaseColumns {
+    class CelebrityEntry : BaseColumns {
 
         companion object {
             const val TABLE_NAME = "celebrities"

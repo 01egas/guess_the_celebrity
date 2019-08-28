@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <item android:title="generate question" android:id="@+id/itemGenerateQuestion"/>
     <item android:title="Reload" android:id="@+id/itemReload" android:icon="@android:drawable/stat_sys_download_done"
     />
     <item android:title="Download" android:id="@+id/itemDownload"/>
+    <item android:title="Put image" android:id="@+id/itemPutImage"/>
 </menu>

@@ -1,5 +1,6 @@
 package com.example.guess_the_celebrity
 
+import android.content.ContentValues
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.AsyncTask
@@ -9,9 +10,9 @@ import android.support.v7.app.AlertDialog
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
-import android.view.View
 import android.widget.Toast
 import com.example.guess_the_celebrity.data.MySQLiteHelper
+import com.example.guess_the_celebrity.data.SqlContract
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.ByteArrayOutputStream
 import java.io.FileNotFoundException
@@ -21,6 +22,9 @@ import java.lang.Exception
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.regex.Pattern
+import android.database.DatabaseUtils
+import kotlin.random.Random
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -32,6 +36,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        Log.i("myTag", "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+
         val builder = AlertDialog.Builder(this)
         builder.setTitle("No data available")
         builder.setMessage("Need download data. This may take some time.")
@@ -39,6 +46,7 @@ class MainActivity : AppCompatActivity() {
             val myAsyncTask = MyAsyncTask()
             myAsyncTask.execute("http://www.posh24.se/kandisar")
             mySQLiteHelper = MySQLiteHelper(this)
+
         }
         builder.show()
 
@@ -47,6 +55,40 @@ class MainActivity : AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
         return true
+    }
+
+    fun generateQuestion() {
+        var arrayList = ArrayList<String>()
+
+        var db = mySQLiteHelper.readableDatabase
+        val numberOfRows = DatabaseUtils.longForQuery(db, "SELECT COUNT(*) FROM " + SqlContract.CelebrityEntry.TABLE_NAME, null).toInt()
+
+        var rightAsk = Random.nextInt(0, numberOfRows - 1)
+        arrayList.add(0, rightAsk.toString())
+        for (i in 1..3) {
+            var n = Random.nextInt(0, numberOfRows - 1)
+            arrayList.add(n.toString())
+        }
+        arrayList.shuffle()
+
+        var cursor = db.rawQuery("select * from celebrities where _ID IN (${arrayList[0]}, ${arrayList[1]}, ${arrayList[2]}, ${arrayList[3]})", null)
+
+        while (cursor.moveToNext()) {
+            Log.i("myTag", cursor.getInt(0).toString()+ "  " + cursor.getString(1))
+
+
+        }
+
+
+
+        if (cursor.moveToFirst()) {
+            var byteArrayImage =  cursor.getBlob(2)
+            var nameImage = cursor.getString(1)
+
+            var bitmap = BitmapFactory.decodeByteArray(byteArrayImage, 0, byteArrayImage.size)
+            ivPhoto.setImageBitmap(bitmap)
+        }
+
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
@@ -63,6 +105,22 @@ class MainActivity : AppCompatActivity() {
 
                 true
             }
+            R.id.itemPutImage -> {
+                var db = mySQLiteHelper.readableDatabase
+                var cursor = db.query(SqlContract.CelebrityEntry.TABLE_NAME, null, "_id = 15", null, null, null, null)
+
+                if (cursor.moveToFirst()) {
+                    var byteArray =  cursor.getBlob(2)
+                    var bitmap = BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size)
+                    ivPhoto.setImageBitmap(bitmap)
+                }
+
+                true
+            }
+            R.id.itemGenerateQuestion -> {
+                generateQuestion()
+                true
+            }
             else -> {
                 super.onOptionsItemSelected(item)
             }
@@ -73,6 +131,13 @@ class MainActivity : AppCompatActivity() {
 
 
         override fun doInBackground(vararg params: String?): Void? {
+            Log.i("myTag", "start asynctask")
+
+            var db = mySQLiteHelper.writableDatabase
+            db.execSQL("DROP TABLE IF EXISTS ${SqlContract.CelebrityEntry.TABLE_NAME}")
+            mySQLiteHelper.onUpgrade(db, 0, 1)
+            var cursor = db.query(SqlContract.CelebrityEntry.TABLE_NAME, null, null, null, null, null, null)
+            Log.i("myTag", "number of records in start ${cursor.count}")
 
 
             var resultHttpText = ""
@@ -110,6 +175,11 @@ class MainActivity : AppCompatActivity() {
                 var valueName: String
                 var httpConnection : HttpURLConnection
                 var inputStreamImage : InputStream
+
+                var byteArrayOutputStream : ByteArrayOutputStream
+                var contentValues : ContentValues
+
+
                 lateinit var valueBitmap : Bitmap
                 var counter = 0
                 while (matcher.find()) {
@@ -131,15 +201,31 @@ class MainActivity : AppCompatActivity() {
 
 
                     arrayNames.add(valueName)
+                    Log.i("myTag", valueName)
                     arrayBitmap.add(valueBitmap)
+
+
+
+
                     counter++
 
-                    var byteArrayOutputStream = ByteArrayOutputStream()
+                    byteArrayOutputStream = ByteArrayOutputStream()
                     valueBitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
+                    contentValues = ContentValues()
+                    contentValues.put(SqlContract.CelebrityEntry.COLUMN_NAME, valueName)
+                    contentValues.put(SqlContract.CelebrityEntry.COLUMN_IMAGE, byteArrayOutputStream.toByteArray())
+                    db.insert(SqlContract.CelebrityEntry.TABLE_NAME, null, contentValues)
+//                    var cursor = db.query(SqlContract.CelebrityEntry.TABLE_NAME, null, null, null, null, null, null)
+                    val numRows = DatabaseUtils.longForQuery(db, "SELECT COUNT(*) FROM " + SqlContract.CelebrityEntry.TABLE_NAME, null).toInt()
+                    Log.i("myTag", "number of records in the process $numRows")
+
+
 
 
                 }
-                publishProgress("the end")
+                val numRows = DatabaseUtils.longForQuery(db, "SELECT COUNT(*) FROM " + SqlContract.CelebrityEntry.TABLE_NAME, null).toInt()
+
+                publishProgress(numRows.toString())
 
 
             } catch (e: Exception) {
@@ -149,9 +235,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         override fun onProgressUpdate(vararg values: String?) {
-            super.onProgressUpdate(*values)
-            Log.i("myTag", values[0])
-            ivPhoto.setImageBitmap(arrayBitmap[15])
+//            Toast.makeText(this, "data download", Toast.LENGTH_LONG).show()
+//            super.onProgressUpdate(*values)
+            Log.i("myTag", "data download, number of records" + values[0])
+
+//            ivPhoto.setImageBitmap(arrayBitmap[15])
 
         }
 
@@ -169,50 +257,7 @@ class MainActivity : AppCompatActivity() {
         return result
     }
 
-    fun onClick(view: View) {
-        ivPhoto.setImageBitmap(getBitmapOnHtml("https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Skater_Tony_Hawk.jpg/1024px-Skater_Tony_Hawk.jpg"))
-    }
 
-    /*
-    *            var result = ""
-            var url : URL
-            var urlConnection : HttpURLConnection
-
-            try {
-                url = URL(params[0])
-
-                urlConnection = url.openConnection() as HttpURLConnection
-
-                var inputStream = urlConnection.inputStream
-                var reader = InputStreamReader(inputStream)
-                var current: Char
-                var data = reader.read()
-                while (data != -1) {
-                    current = data.toChar()
-                    result += current
-                    data = reader.read()
-                }
-
-                val p1 = Pattern.compile("<img src=\"(.*?)\"alt=\"(.*?)\"")
-                val p2 = Pattern.compile("alt=\"(.*?)\"")
-
-                val m1 = p1.matcher(result)
-                val m2 = p2.matcher(result)
-
-                var count = 0
-                while (m1.find() && m2.find()) {
-                    arrayPhoto.set(count, m1.group(1))
-                    arrayNames.set(count, m2.group(1))
-                    Log.i("myTag", count.toString())
-                    count++
-                }
-                return result
-            } catch (e: Exception) {
-                e.printStackTrace()
-                Log.i("myTag","failed task")
-                return e.printStackTrace().toString()
-            }
- */
 
 
 }
